@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  HOSPITAL_ADMIN
+  DOCTOR
+  RECEPTIONIST
+  PATIENT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+  UNKNOWN
+}
+
+enum HospitalStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+enum HospitalType {
+  PUBLIC
+  PRIVATE
+  MISSION
+  CLINIC
+  SPECIALIST
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum VisitType {
+  OUTPATIENT
+  INPATIENT
+  EMERGENCY
+  FOLLOW_UP
+  TELEMEDICINE
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  role          Role      @default(PATIENT)
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  patient  Patient?
+  doctor   Doctor?
+  hospital Hospital? @relation("HospitalAdmin")
+
+  @@map("users")
+}
+
+model Patient {
+  id               String     @id @default(cuid())
+  userId           String     @unique
+  nationalId       String     @unique
+  patientNumber    String     @unique
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  gender           Gender
+  bloodGroup       BloodGroup @default(UNKNOWN)
+  phone            String
+  email            String?
+  address          String?
+  city             String?
+  country          String     @default("Kenya")
+  photoUrl         String?
+  emergencyName    String?
+  emergencyPhone   String?
+  emergencyRel     String?
+  insuranceNumber  String?
+  insuranceProvider String?
+  isActive         Boolean    @default(true)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  allergies    Allergy[]
+  visits       Visit[]
+  appointments Appointment[]
+  documents    Document[]
+
+  @@map("patients")
+}
+
+model Allergy {
+  id        String   @id @default(cuid())
+  patientId String
+  substance String
+  reaction  String?
+  severity  String   @default("Moderate")
+  createdAt DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@map("allergies")
+}
+
+model Hospital {
+  id            String         @id @default(cuid())
+  adminUserId   String?        @unique
+  name          String
+  slug          String         @unique
+  licenseNumber String         @unique
+  type          HospitalType   @default(PUBLIC)
+  status        HospitalStatus @default(PENDING)
+  description   String?
+  phone         String
+  email         String
+  website       String?
+  address       String
+  city          String
+  county        String?
+  country       String         @default("Kenya")
+  logoUrl       String?
+  bedCapacity   Int?
+  established   Int?
+  emergencyLine String?
+  isActive      Boolean        @default(true)
+  approvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  adminUser    User?            @relation("HospitalAdmin", fields: [adminUserId], references: [id])
+  departments  Department[]
+  services     Service[]
+  doctors      HospitalDoctor[]
+  visits       Visit[]
+  appointments Appointment[]
+
+  @@map("hospitals")
+}
+
+model Department {
+  id           String   @id @default(cuid())
+  hospitalId   String
+  name         String
+  description  String?
+  floor        String?
+  phone        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  hospital Hospital        @relation(fields: [hospitalId], references: [id])
+  doctors  HospitalDoctor[]
+
+  @@map("departments")
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  hospitalId  String
+  name        String
+  description String?
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+
+  @@map("services")
+}
+
+model Doctor {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  licenseNumber   String    @unique
+  firstName       String
+  lastName        String
+  specialisation  String
+  qualifications  String
+  yearsExperience Int       @default(0)
+  bio             String?
+  phone           String
+  photoUrl        String?
+  isAvailable     Boolean   @default(true)
+  isVerified      Boolean   @default(false)
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user         User             @relation(fields: [userId], references: [id])
+  hospitals    HospitalDoctor[]
+  visits       Visit[]
+  appointments Appointment[]
+
+  @@map("doctors")
+}
+
+model HospitalDoctor {
+  id           String    @id @default(cuid())
+  doctorId     String
+  hospitalId   String
+  departmentId String?
+  isPrimary    Boolean   @default(false)
+  joinedAt     DateTime  @default(now())
+  leftAt       DateTime?
+  isActive     Boolean   @default(true)
+
+  doctor     Doctor      @relation(fields: [doctorId], references: [id])
+  hospital   Hospital    @relation(fields: [hospitalId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  @@unique([doctorId, hospitalId])
+  @@map("hospital_doctors")
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  patientId   String
+  doctorId    String
+  hospitalId  String
+  scheduledAt DateTime
+  duration    Int               @default(30)
+  reason      String
+  notes       String?
+  status      AppointmentStatus @default(SCHEDULED)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  patient  Patient  @relation(fields: [patientId], references: [id])
+  doctor   Doctor   @relation(fields: [doctorId], references: [id])
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  visit    Visit?
+
+  @@map("appointments")
+}
+
+model Visit {
+  id                String    @id @default(cuid())
+  patientId         String
+  doctorId          String
+  hospitalId        String
+  appointmentId     String?   @unique
+  visitDate         DateTime  @default(now())
+  visitType         VisitType @default(OUTPATIENT)
+  chiefComplaint    String
+  consultationNotes String?
+  examination       String?
+  temperature       Float?
+  bloodPressure     String?
+  pulse             Int?
+  weight            Float?
+  height            Float?
+  oxygenSat         Float?
+  followUpDate      DateTime?
+  admittedAt        DateTime?
+  dischargedAt      DateTime?
+  isCompleted       Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  doctor        Doctor         @relation(fields: [doctorId], references: [id])
+  hospital      Hospital       @relation(fields: [hospitalId], references: [id])
+  appointment   Appointment?   @relation(fields: [appointmentId], references: [id])
+  diagnoses     Diagnosis[]
+  prescriptions Prescription[]
+  labResults    LabResult[]
+  documents     Document[]
+
+  @@map("visits")
+}
+
+model Diagnosis {
+  id          String   @id @default(cuid())
+  visitId     String
+  icdCode     String?
+  description String
+  isPrimary   Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  visit Visit @relation(fields: [visitId], references: [id])
+
+  @@map("diagnoses")
+}
+
+model Prescription {
+  id           String   @id @default(cuid())
+  visitId      String
+  medication   String
+  dosage       String
+  frequency    String
+  duration     String
+  route        String   @default("Oral")
+  instructions String?
+  isDispensed  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  visit Visit @relation(fields: [visitId], references: [id])
+
+  @@map("prescriptions")
+}
+
+model LabResult {
+  id          String    @id @default(cuid())
+  visitId     String
+  testName    String
+  testCode    String?
+  result      String?
+  unit        String?
+  normalRange String?
+  isAbnormal  Boolean   @default(false)
+  notes       String?
+  conductedAt DateTime?
+  reportUrl   String?
+  createdAt   DateTime  @default(now())
+
+  visit Visit @relation(fields: [visitId], references: [id])
+
+  @@map("lab_results")
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  patientId   String
+  visitId     String?
+  uploadedBy  String
+  name        String
+  type        String
+  url         String
+  size        Int?
+  mimeType    String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id])
+  visit   Visit?  @relation(fields: [visitId], references: [id])
+
+  @@map("documents")
+}
