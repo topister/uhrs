@@ -9,7 +9,7 @@ type AuthRequest = NextRequest & {
 const PUBLIC_ROUTES = ["/", "/login", "/register", "/hospitals", "/doctors"];
 const AUTH_ROUTES = ["/login", "/register"];
 
-export const middleware = auth(function middleware(req) {
+export const proxy = auth(function proxy(req) {
   const { nextUrl } = req as AuthRequest;
   const session = (req as AuthRequest).auth;
   const isLoggedIn = !!session?.user;
